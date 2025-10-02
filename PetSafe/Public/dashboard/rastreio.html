@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PetSafe - Rastreamento</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../app/css/style-ras.css">
+  <link rel="shortcut icon" href="../Public/imagens/logo.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <header>Rastreamento de Pets</header>
+  <main>  
+    <div class="controls-header">
+      <h2>Mapa de Localização</h2>
+      <div>
+        <select id="mapStyle" class="map-style-select">
+          <option value="streets">Ruas</option>
+          <option value="satellite">Satélite</option>
+          <option value="terrain">Terreno</option>
+        </select>
+        <button id="addPetBtn" class="btn btn-primary">+ Adicionar Pet</button>
+      </div>
+    </div>
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+    <section id="selectedAnimalDetails" class="selected-animal-details hidden">
+      <h3>Detalhes do Pet Selecionado</h3>
+      <div id="animalDetailsContent" class="animal-details-grid"></div>
+    </section>
+  </main>
+
+  <div id="petModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Cadastrar Novo Pet</h3>
+        <button class="close-btn">&times;</button>
+      </div>
+      <div class="form-group">
+        <label for="petNome">Nome do Pet</label>
+        <input type="text" id="petNome" placeholder="Ex: Bob">
+      </div>
+      <div class="form-group">
+        <label for="petEspecie">Espécie</label>
+        <input type="text" id="petEspecie" placeholder="Ex: Cachorro">
+      </div>
+      <div class="form-group">
+        <label for="petStatus">Status</label>
+        <select id="petStatus">
+          <option value="Ativo">Ativo</option>
+          <option value="Inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="petLat">Latitude</label>
+        <input type="number" id="petLat" placeholder="Clique no mapa para preencher">
+      </div>
+      <div class="form-group">
+        <label for="petLng">Longitude</label>
+        <input type="number" id="petLng" placeholder="Clique no mapa para preencher">
+      </div>
+      <div class="modal-actions">
+        <button id="cancelPet" class="btn">Cancelar</button>
+        <button id="savePet" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const animais = [
+        { id: 1, nome: "Rex", especie: "Cachorro", localizacao: [-12.2664, -38.9663], status: "Ativo", ultimaAtualizacao: "2025-09-29 14:30" }
+      ];
+      const map = L.map('map').setView([-12.2664, -38.9663], 13);
+      const baseLayers = {
+        streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }),
+        satellite: L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'] }),
+        terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 })
+      };
+      baseLayers.streets.addTo(map);
+
+      let animalMarkers = [];
+      const limparMarcadores = () => {
+        animalMarkers.forEach(marker => map.removeLayer(marker));
+        animalMarkers = [];
+      };
+
+      const adicionarMarcadores = () => {
+        limparMarcadores();
+        animais.forEach(animal => {
+          const marker = L.marker(animal.localizacao).addTo(map)
+            .bindPopup(`<b>${animal.nome}</b><br>${animal.especie}`);
+          marker.animalId = animal.id;
+          marker.on('click', () => selecionarAnimal(animal.id));
+          animalMarkers.push(marker);
+        });
+      };
+
+    const selecionarAnimal = (id) => {
+        const animal = animais.find(a => a.id === id);
+        if (!animal) return;
+        const detalhes = document.getElementById('selectedAnimalDetails');
+        const content = document.getElementById('animalDetailsContent');
+        content.innerHTML = `
+          <div class="label">Nome:</div><div>${animal.nome}</div>
+          <div class="label">Espécie:</div><div>${animal.especie}</div>
+          <div class="label">Status:</div><div><span style="color: ${animal.status === 'Ativo' ? 'green' : 'red'}; font-weight: bold;">${animal.status}</span></div>
+          <div class="label">Última Atualização:</div><div>${animal.ultimaAtualizacao}</div>
+          <div class="label">Coordenadas:</div><div>${animal.localizacao[0].toFixed(4)}, ${animal.localizacao[1].toFixed(4)}</div>
+        `;
+        detalhes.classList.remove('hidden');
+        const marker = animalMarkers.find(m => m.animalId === id);
+        if (marker) {
+          map.setView(marker.getLatLng(), 15);
+          marker.openPopup();
+        }
+      };
+
+  /*    document.getElementById('mapStyle').addEventListener('change', (e) => {
+        const style = e.target.value;
+        Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+        if (baseLayers[style]) baseLayers[style].addTo(map);
+      });
+
+      const modal = document.getElementById("petModal");
+      const petNomeInput = document.getElementById("petNome");
+      const petEspecieInput = document.getElementById("petEspecie");
+      const petLatInput = document.getElementById("petLat");
+      const petLngInput = document.getElementById("petLng");
+      const closeBtns = document.querySelectorAll(".close-btn, #cancelPet");
+      */
+   /*   const openModal = () => modal.style.display = "flex";
+      const closeModal = () => {
+          modal.style.display = "none";
+          petNomeInput.value = "";
+          petEspecieInput.value = "";
+          petLatInput.value = "";
+          petLngInput.value = "";
+      };*/
+      //BOTÃO DE ADICIONAR PET (FUNCIONALIDADE REMOVIDA BY: IAN)
+     /* document.getElementById("addPetBtn").onclick = openModal;
+      closeBtns.forEach(btn => btn.onclick = closeModal);
+      
+      map.on('click', (e) => {
+          petLatInput.value = e.latlng.lat.toFixed(5);
+          petLngInput.value = e.latlng.lng.toFixed(5);
+          openModal();
+      });*/
+
+   /*   document.getElementById("savePet").onclick = () => {
+        const nome = petNomeInput.value.trim();
+        const especie = petEspecieInput.value.trim();
+        const status = document.getElementById("petStatus").value;
+        const lat = parseFloat(petLatInput.value);
+        const lng = parseFloat(petLngInput.value);
+        
+        if (!nome || !especie || isNaN(lat) || isNaN(lng)) {
+          alert("Por favor, preencha todos os campos corretamente.");
+          return;
+        }
+
+        const novoPet = {
+          id: Date.now(),
+          nome,
+          especie,
+          status,
+          localizacao: [lat, lng],
+          ultimaAtualizacao: new Date().toLocaleString("pt-BR", { dateStyle: 'short', timeStyle: 'short' })
+        };
+        animais.push(novoPet);
+        adicionarMarcadores();
+        selecionarAnimal(novoPet.id);
+        closeModal();
+      };*/
+      
+      adicionarMarcadores();
+      if (animais.length > 0) selecionarAnimal(animais[0].id);
+    });
+  </script>
+</body>
+</html>

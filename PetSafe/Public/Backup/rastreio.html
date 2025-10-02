@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa Leaflet Exemplo</title>
+  <link rel="stylesheet" href="../app/css/style-ras.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <header>
+   <!-- <nav class="navegacao">-->
+     <!--  <button class="nav-btn active" data-view="animais">Animais</button>-->
+     <!--  <button class="nav-btn" data-view="mapa">Mapa</button>-->
+    <!--  <button class="nav-btn" data-view="sair">Sair</button> -->
+     <!-- <button id="toggleSidebar" class="nav-btn">☰ Sidebar</button>-->
+    </nav>
+  </header>
+
+  <main>  
+    <div id="mapView" class="view">
+      <div class="view-header">
+        <div class="view-title">
+       <!---   <h2>Mapa de Rastreamento</h2>
+         <p id="mapAnimalCount">0 animais no mapa</p>-->
+        </div>
+        <select id="mapStyle" class="map-style-select" title="Selecione o estilo do mapa">
+          <option value="streets">Ruas</option>
+          <option value="satellite">Satélite</option>
+          <option value="terrain">Terreno</option>
+        </select>
+      </div>
+      
+    <!-- <div class="map-container">
+        <aside class="map-sidebar">
+          <h3>Animais</h3>
+          <div id="animalList" class="animal-list">
+            <p class="empty-state">Nenhum animal para exibir</p>
+          </div>
+        </aside>--> 
+        <section class="map-content">
+          <div id="map"></div>
+          <div id="mapLoading" class="map-loading">
+            <div class="spinner"></div>
+            <p>Carregando mapa...</p>
+          </div>
+        </section>
+      </div>
+      
+      <section id="selectedAnimalDetails" class="selected-animal-details hidden">
+        <h3>Detalhes do Animal Selecionado</h3>
+        <div id="animalDetailsContent" class="animal-details-grid"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Dados de exemplo de animais
+    const animais = [
+      {
+        id: 1,
+        nome: "Onça Pintada",
+        especie: "Panthera onca",
+        localizacao: [-12.2011, -39.0536],
+        status: "Ativo",
+        ultimaAtualizacao: "2024-06-01 14:30"
+      },
+      {
+        id: 2,
+        nome: "Arara Azul",
+        especie: "Anodorhynchus hyacinthinus",
+        localizacao: [-12.25, -39.1],
+        status: "Ativo",
+        ultimaAtualizacao: "2024-06-01 13:50"
+      },
+      {
+        id: 3,
+        nome: "Tamanduá-bandeira",
+        especie: "Myrmecophaga tridactyla",
+        localizacao: [-12.18, -39.0],
+        status: "Inativo",
+        ultimaAtualizacao: "2024-05-30 09:20"
+      }
+    ];
+
+    const map = L.map('map').setView([-12.2011, -39.0536], 10);
+
+    // Camadas base para troca de estilos
+    const baseLayers = {
+      streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }),
+      satellite: L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: 'Google Satellite'
+      }),
+      terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17,
+        attribution: 'Map data: &copy; OpenTopoMap contributors'
+      })
+    };
+
+    baseLayers.streets.addTo(map);
+
+    let animalMarkers = [];
+
+    function atualizarListaAnimais() {
+      const animalList = document.getElementById('animalList');
+      animalList.innerHTML = '';
+
+      if (animais.length === 0) {
+        animalList.innerHTML = '<p class="empty-state">Nenhum animal para exibir</p>';
+        document.getElementById('mapAnimalCount').textContent = '0 animais no mapa';
+        return;
+      }
+
+      document.getElementById('mapAnimalCount').textContent = `${animais.length} animal${animais.length > 1 ? 's' : ''} no mapa`;
+
+      animais.forEach(animal => {
+        const div = document.createElement('div');
+        div.className = 'animal-item';
+        div.textContent = animal.nome;
+        div.dataset.id = animal.id;
+        div.title = `Espécie: ${animal.especie}`;
+        div.addEventListener('click', () => {
+          selecionarAnimal(animal.id);
+        });
+        animalList.appendChild(div);
+      });
+    }
+
+    function limparMarcadores() {
+      animalMarkers.forEach(marker => map.removeLayer(marker));
+      animalMarkers = [];
+    }
+
+    function adicionarMarcadores() {
+      limparMarcadores();
+      animais.forEach(animal => {
+        const marker = L.marker(animal.localizacao).addTo(map)
+          .bindPopup(`<b>${animal.nome}</b><br>Espécie: ${animal.especie}<br>Status: ${animal.status}`);
+        marker.animalId = animal.id;
+        marker.on('click', () => {
+          selecionarAnimal(animal.id);
+        });
+        animalMarkers.push(marker);
+      });
+    }
+
+    function selecionarAnimal(id) {
+      const animal = animais.find(a => a.id === id);
+      if (!animal) return;
+
+      document.querySelectorAll('.animal-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.id == id);
+      });
+
+      const detalhes = document.getElementById('selectedAnimalDetails');
+      const content = document.getElementById('animalDetailsContent');
+      content.innerHTML = `
+        <div class="label">Nome:</div><div>${animal.nome}</div>
+        <div class="label">Espécie:</div><div>${animal.especie}</div>
+        <div class="label">Status:</div><div>${animal.status}</div>
+        <div class="label">Última Atualização:</div><div>${animal.ultimaAtualizacao}</div>
+        <div class="label">Localização:</div><div>Lat: ${animal.localizacao[0].toFixed(5)}, Lng: ${animal.localizacao[1].toFixed(5)}</div>
+      `;
+      detalhes.classList.remove('hidden');
+
+      const marker = animalMarkers.find(m => m.animalId === id);
+      if (marker) {
+        map.setView(marker.getLatLng(), 13);
+        marker.openPopup();
+      }
+    }
+
+    document.getElementById('mapStyle').addEventListener('change', (e) => {
+      const style = e.target.value;
+      Object.values(baseLayers).forEach(layer => {
+        if (map.hasLayer(layer)) {
+          map.removeLayer(layer);
+        }
+      });
+      if (baseLayers[style]) {
+        baseLayers[style].addTo(map);
+      }
+    });
+
+    function init() {
+      atualizarListaAnimais();
+      adicionarMarcadores();
+      if (animais.length > 0) {
+        selecionarAnimal(animais[0].id);
+      }
+    }
+
+    const mapLoading = document.getElementById('mapLoading');
+    mapLoading.style.display = 'flex';
+    map.on('load', () => {
+      mapLoading.style.display = 'none';
+    });
+    if (map._loaded) {
+      mapLoading.style.display = 'none';
+    }
+
+   /* // Toggle sidebar no mobile
+    document.getElementById("toggleSidebar").addEventListener("click", () => {
+      document.querySelector(".map-sidebar").classList.toggle("hidden");
+    });*/
+
+    init();
+  </script>
+</body>
+</html>
